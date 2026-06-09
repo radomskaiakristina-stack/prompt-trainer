@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр промтов · Введение в Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f3ec;
+    --bg-2:#fefcf8;
+    --panel:#ffffff;
+    --panel-2:#f1ebe0;
+    --line:#e8e0d2;
+    --line-soft:#dcd2c0;
+    --orange:#e8762b;
+    --orange-soft:#f0934e;
+    --orange-dim:rgba(232,118,43,.1);
+    --green:#5f9244;
+    --red:#d25a36;
+    --text:#2a2620;
+    --text-2:#5c554a;
+    --text-3:#938a7b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(circle at 88% 8%, rgba(232,118,43,.08), transparent 40%),
+      radial-gradient(circle at 6% 96%, rgba(232,118,43,.05), transparent 44%);
+  }
+  .app{height:100%;display:flex;flex-direction:column;overflow:hidden}
+
+  /* rail */
+  .rail{flex-shrink:0;display:flex;gap:6px;align-items:center;
+    padding:14px clamp(16px,4vw,30px);
+    background:rgba(247,243,236,.9);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:9px;margin-right:14px;flex-shrink:0}
+  .brand .star{width:18px;height:18px;flex-shrink:0}
+  .brand b{font-size:13px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+  .pip{flex:1;height:4px;border-radius:2px;background:var(--panel-2);overflow:hidden;position:relative;max-width:90px}
+  .pip span{position:absolute;inset:0;background:var(--orange);transform:scaleX(0);transform-origin:left;transition:transform .5s}
+  .pip.done span{transform:scaleX(1)}
+  .pip.active span{transform:scaleX(.5)}
+  .rail-num{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-3);white-space:nowrap}
+
+  /* deck */
+  .deck{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .deck-inner{width:100%;max-width:760px;margin:0 auto;padding:30px clamp(18px,4.5vw,30px) 34px}
+  .slide{display:none;animation:fade .4s ease}
+  .slide.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .kicker{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:28px;height:1px;background:var(--orange)}
+
+  h1{font-size:clamp(30px,5.4vw,50px);font-weight:700;line-height:1.04;letter-spacing:-.02em;margin-bottom:16px}
+  h1 em{font-style:normal;color:var(--orange)}
+  h2{font-size:clamp(22px,3.6vw,32px);font-weight:600;letter-spacing:-.01em;margin-bottom:12px;line-height:1.14}
+  .lede{font-size:clamp(15px,1.9vw,17px);max-width:56ch;color:var(--text-2);margin-bottom:12px}
+  p{margin-bottom:12px;max-width:62ch;color:var(--text-2)}
+  .muted{color:var(--text-3);font-size:14px}
+  strong{color:var(--text)}
+
+  /* formula chips */
+  .formula{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:22px 0}
+  .chip{font-family:'IBM Plex Mono',monospace;font-size:13px;padding:8px 14px;border-radius:30px;border:1px solid var(--line-soft);background:var(--panel);color:var(--text)}
+  .chip b{color:var(--orange)}
+  .arrow{color:var(--text-3);font-size:18px}
+
+  /* scenario */
+  .scenario-tag{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:0 14px 14px 0;padding:15px 18px;margin:20px 0 22px;box-shadow:0 2px 12px rgba(42,38,32,.04)}
+  .scenario-tag .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:6px}
+  .scenario-tag p{margin:0;font-size:16px;color:var(--text)}
+
+  /* choices */
+  .choices{display:grid;gap:13px;margin-bottom:8px}
+  .opt{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px 19px;cursor:pointer;font-family:inherit;font-size:14.5px;color:var(--text-2);transition:border-color .2s,transform .15s,box-shadow .2s;position:relative;box-shadow:0 2px 12px rgba(42,38,32,.04)}
+  .opt:hover{border-color:var(--orange-soft);transform:translateY(-1px);box-shadow:0 6px 18px rgba(42,38,32,.07)}
+  .opt .qmark{line-height:1.5}
+  .opt.correct{border-color:var(--green);background:rgba(127,168,106,.08)}
+  .opt.wrong{border-color:var(--red);background:rgba(217,107,74,.07)}
+  .opt .badge{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-top:10px;opacity:0;transition:opacity .3s}
+  .opt.correct .badge{opacity:1;color:var(--green)}
+  .opt.wrong .badge{opacity:1;color:var(--red)}
+  .choices.locked .opt{cursor:default;pointer-events:none}
+  .choices.locked .opt:not(.correct):not(.wrong){opacity:.45}
+
+  /* explain */
+  .explain{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .explain .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--orange);margin-bottom:10px}
+  .explain p{font-size:15px;color:var(--text-2);margin:0}
+  .explain p+p{margin-top:10px}
+  .explain b{color:var(--text)}
+  .pinpoint{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--orange);background:var(--orange-dim);padding:2px 8px;border-radius:6px;margin-bottom:12px}
+
+  /* nav */
+  .nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;gap:12px}
+  .btn{font-family:inherit;font-size:15px;font-weight:600;border-radius:10px;padding:13px 24px;cursor:pointer;transition:transform .15s,background .2s,opacity .2s;display:inline-flex;align-items:center;gap:10px;border:none}
+  .btn-primary{background:var(--orange);color:#fff}
+  .btn-primary:hover{background:var(--orange-soft);transform:translateY(-1px)}
+  .btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none}
+  .btn-ghost{background:none;border:1px solid var(--line-soft);color:var(--text-2)}
+  .btn-ghost:hover{border-color:var(--text-2);color:var(--text)}
+
+  /* practice */
+  .scenario-nav{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+  .scenario-nav button{font-family:'IBM Plex Mono',monospace;font-size:12px;background:none;border:1px solid var(--line-soft);border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--text-3);transition:all .2s}
+  .scenario-nav button:hover{border-color:var(--orange);color:var(--orange)}
+  .scenario-nav button.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .big-ta{width:100%;min-height:120px;resize:vertical;font-family:inherit;font-size:15px;line-height:1.5;padding:14px;border:1px solid var(--line-soft);border-radius:12px;background:var(--panel);color:var(--text);margin-top:6px}
+  .big-ta::placeholder{color:var(--text-3)}
+  .big-ta:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(232,134,43,.15)}
+  .err{color:var(--red);font-size:14px;margin-top:12px;display:none}
+
+  /* self-check */
+  .eval{opacity:0;transform:translateY(8px);transition:all .4s;display:none}
+  .eval.show{opacity:1;transform:none;display:block}
+  .myprompt{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+  .myprompt .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px}
+  .myprompt p{font-size:14px;color:var(--text-2);font-style:italic;margin:0;max-height:80px;overflow-y:auto}
+  .selfscore{font-size:16px;font-weight:600;color:var(--text);margin-bottom:10px;min-height:24px}
+  .selfscore b{color:var(--orange)}
+  .checklist{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .check{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+  .check:hover{border-color:var(--orange-soft)}
+  .check.on{border-color:var(--orange);background:var(--orange-dim)}
+  .check .box{flex-shrink:0;width:22px;height:22px;border:2px solid var(--line-soft);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;transition:all .2s;margin-top:1px}
+  .check.on .box{background:var(--orange);border-color:var(--orange)}
+  .check .box span{opacity:0;transition:opacity .15s}
+  .check.on .box span{opacity:1}
+  .check .ct strong{display:block;font-size:14px;margin-bottom:2px}
+  .check .ct .sub{font-size:13px;color:var(--text-3);line-height:1.4}
+  .rewrite-det{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 18px}
+  .rewrite-det summary{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--orange);cursor:pointer;list-style:none}
+  .rewrite-det summary::-webkit-details-marker{display:none}
+  .rewrite-det[open] summary{margin-bottom:10px}
+  .rewrite-det p{font-size:14px;color:var(--text-2);margin:0}
+
+  /* score + criteria */
+  .score-row{display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+  .score-ring{position:relative;width:68px;height:68px;flex-shrink:0}
+  .score-ring svg{transform:rotate(-90deg)}
+  .score-ring .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--text)}
+  .score-verdict{font-size:18px;font-weight:600;line-height:1.2;color:var(--text)}
+  .score-verdict small{display:block;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-3);font-weight:400;margin-top:4px}
+  .crit{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .crit-item{padding:11px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+  .crit-item:last-child{border-bottom:none}
+  .crit-mark{font-family:'IBM Plex Mono',monospace;font-weight:500;flex-shrink:0;width:20px;font-size:15px}
+  .crit-mark.yes{color:var(--green)}.crit-mark.no{color:var(--red)}.crit-mark.mid{color:var(--orange)}
+  .crit-body strong{display:block;font-size:13.5px;margin-bottom:1px}
+  .crit-body span{font-size:13px;color:var(--text-3);line-height:1.4}
+
+  /* intro hero */
+  .hero-star{width:60px;height:60px;margin-bottom:22px}
+</style>
+</head>
+<body>
+
+<div class="app">
+<div class="rail" id="rail">
+  <div class="brand">
+    <svg class="star" viewBox="0 0 24 24" fill="none"><g stroke="var(--orange)" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="5.6" y2="18.4"/></g></svg>
+    <b>Введение в Claude</b>
+  </div>
+</div>
+
+<div class="deck">
+<div class="deck-inner">
+
+  <!-- INTRO -->
+  <div class="slide active" data-slide="0">
+    <svg class="hero-star" viewBox="0 0 24 24" fill="none"><g stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/><line x1="19.1" y1="4.9" x2="4.9" y2="19.1"/></g></svg>
+    <div class="kicker">Модуль · промт-инжиниринг</div>
+    <h1>Как объяснить Claude,<br><em>что тебе нужно</em></h1>
+    <p class="lede">Модель работает не с тем, что ты имел в виду, а с тем, что написал. Сначала три задания — найти промт, который сработает. Потом напишешь свой и сверишь по чек-листу.</p>
+    <div class="formula">
+      <span class="chip"><b>Задача</b></span><span class="arrow">→</span>
+      <span class="chip"><b>Контекст</b></span><span class="arrow">→</span>
+      <span class="chip"><b>Правила</b></span><span class="arrow">→</span>
+      <span class="chip"><b>Результат</b></span>
+    </div>
+    <p class="muted">В заданиях оба промта выглядят прилично. Разница — в деталях. Держи формулу в голове.</p>
+    <div class="nav">
+      <span></span>
+      <button class="btn btn-primary" data-go="next">Начать →</button>
+    </div>
+  </div>
+
+  <div id="taskMount"></div>
+
+  <!-- PRACTICE CASES injected here (input + feedback per case) -->
+  <div id="caseMount"></div>
+
+  <!-- FINISH -->
+  <div class="slide" data-slide="finish">
+    <svg class="hero-star" viewBox="0 0 24 24" fill="none"><g stroke="var(--orange)" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/><line x1="19.1" y1="4.9" x2="4.9" y2="19.1"/></g></svg>
+    <div class="kicker">Готово</div>
+    <h2>Это вся механика</h2>
+    <p>Четыре кейса позади. Формула простая и держится в голове: <strong>Задача → Контекст → Правила → Результат</strong>. Чем меньше Claude приходится угадывать, тем точнее ответ — и тем меньше правок потом.</p>
+    <p class="muted">Дальше — на своих задачах. Можно вернуться и пройти кейсы заново.</p>
+    <div class="nav">
+      <button class="btn btn-ghost" data-go="restart">↺ Пройти заново</button>
+      <span></span>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+/* ---------- TASKS: оба варианта одной длины, разница в одном критерии ---------- */
+const tasks=[
+  {
+    scenario:"Тебе нужно письмо клиенту, который отказался от сотрудничества из-за бюджета. Оба промта подробные — какой сработает лучше?",
+    options:[
+      "Напиши тёплое, профессиональное письмо клиенту. Пусть оно будет вежливым, аккуратным, без давления, с уважением к его решению. Сделай красиво и по делу, чтобы человеку было приятно его читать.",
+      "Напиши письмо клиенту, который отказался из-за бюджета. Тон тёплый, без давления. Цель — оставить дверь открытой и предложить вернуться к разговору через 3 месяца. Коротко, готово к отправке."
+    ],
+    correct:1,
+    pinpoint:"дело в контексте и цели",
+    why:"<p><b>Второй.</b> Первый звучит гладко — там есть тон и даже забота о читателе. Но нет главного: <b>почему</b> пишем (отказ из-за бюджета) и <b>зачем</b> (вернуться через 3 месяца). Без этого Claude напишет вежливое письмо ни о чём.</p><p>Второй короче, но в нём есть ситуация и цель — модель понимает, что письмо должно сделать.</p>"
+  },
+  {
+    scenario:"Нужно превратить часовую запись вебинара в пост для внутреннего телеграма команды. Оба варианта детальные — что выбрать?",
+    options:[
+      "Вот расшифровка вебинара [текст]. Сделай из неё пост для нашего телеграма: интересный, живой, с понятной структурой, разговорным тоном, без воды и канцелярита. Чтобы людям захотелось прочитать до конца.",
+      "Вот расшифровка вебинара [текст]. Вытащи 3 главные мысли и собери пост для внутреннего телеграма команды L&D, 800–1000 знаков, разговорным тоном. Без призывов «обязательно посмотрите запись»."
+    ],
+    correct:1,
+    pinpoint:"дело в результате",
+    why:"<p><b>Второй.</b> Первый задаёт тон и настроение, но не говорит, <b>что на выходе</b>: сколько мыслей, какой длины, что не нужно. «Интересный и живой» — это вкус, а не инструкция.</p><p>Второй даёт конкретику: 3 мысли, 800–1000 знаков, чего избегать. По нему результат предсказуем.</p>"
+  },
+  {
+    scenario:"Ты просишь Claude разобрать сырой бриф клиента в концепцию курса. Оба промта длинные — какой точнее?",
+    options:[
+      "Вот бриф клиента [текст]. Собери из него цель обучения, аудиторию и структуру из 4–5 модулей с результатами по каждому. Если в брифе чего-то не хватает — спроси, не придумывай.",
+      "Вот бриф клиента [текст]. Сделай по нему полноценную концепцию курса — глубоко, профессионально, со всеми важными элементами методологии, как это сделал бы опытный методолог. Постарайся ничего не упустить."
+    ],
+    correct:0,
+    pinpoint:"дело в задаче и правилах",
+    why:"<p><b>Первый.</b> Второй звучит солиднее — «профессионально», «как методолог», — но это пустые слова. Не сказано, <b>что именно</b> должно быть в концепции и что делать с дырами в брифе.</p><p>Первый перечисляет состав (цель, аудитория, 4–5 модулей с результатами) и даёт правило: не хватает данных — спроси, а не выдумывай. Вот это работает.</p>"
+  }
+];
+
+const practiceScenarios=[
+  "Коллега из соседнего отдела просит «накидать что-нибудь по онбордингу новичков». Тебе нужно, чтобы Claude помог. Напиши ему запрос.",
+  "Руководитель скинул заметки со встречи и сказал: «Сделай нормальную повестку для следующего созвона». Сформулируй промт для Claude.",
+  "Тебе нужно письмо подрядчику, который сорвал срок второй раз подряд. Отношения портить нельзя, но дедлайн критичен. Напиши промт.",
+  "Нужно собрать короткий тест из 5 вопросов по модулю про обратную связь — для проверки усвоения. Сформулируй запрос к Claude."
+];
+
+/* ---------- BUILD TASK SLIDES ---------- */
+const mount=document.getElementById('taskMount');
+tasks.forEach((t,i)=>{
+  const choiceSlide=document.createElement('div');
+  choiceSlide.className='slide';choiceSlide.dataset.slide='task'+i;
+  choiceSlide.innerHTML=`
+    <div class="kicker">Задание ${i+1} из 3</div>
+    <h2>Какой промт сработает</h2>
+    <div class="scenario-tag"><div class="lbl">Ситуация</div><p>${t.scenario}</p></div>
+    <div class="choices" id="ch${i}">
+      ${t.options.map((o,j)=>`<button class="opt" data-i="${i}" data-j="${j}"><span class="qmark">«${o}»</span><span class="badge"></span></button>`).join('')}
+    </div>
+    <div class="nav">
+      <button class="btn btn-ghost" data-go="prev">← Назад</button>
+      <button class="btn btn-primary" id="next${i}" disabled data-go="next">Дальше →</button>
+    </div>`;
+  mount.appendChild(choiceSlide);
+
+  const exSlide=document.createElement('div');
+  exSlide.className='slide';exSlide.dataset.slide='explain'+i;
+  exSlide.innerHTML=`
+    <div class="kicker">Задание ${i+1} · разбор</div>
+    <h2>Почему так</h2>
+    <div class="explain">
+      <span class="pinpoint">${t.pinpoint}</span>
+      ${t.why}
+    </div>
+    <div class="nav">
+      <button class="btn btn-ghost" data-go="prev">← Назад</button>
+      <button class="btn btn-primary" data-go="next">Дальше →</button>
+    </div>`;
+  mount.appendChild(exSlide);
+});
+
+document.querySelectorAll('.opt').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const i=+b.dataset.i, j=+b.dataset.j;
+    const ch=document.getElementById('ch'+i);
+    if(ch.classList.contains('locked'))return;
+    ch.classList.add('locked');
+    const correct=tasks[i].correct;
+    ch.querySelectorAll('.opt').forEach(o=>{
+      const oj=+o.dataset.j;
+      if(oj===correct){o.classList.add('correct');o.querySelector('.badge').textContent='✓ рабочий';}
+      else if(oj===j){o.classList.add('wrong');o.querySelector('.badge').textContent='✕ звучит хорошо, но мимо';}
+    });
+    document.getElementById('next'+i).disabled=false;
+  });
+});
+
+/* ---------- PRACTICE: input + auto-feedback per case, then auto-advance ---------- */
+const CRIT=[
+  {name:'Задача', verbs:['напиш','сдела','собер','состав','подготов','преврат','вытащ','разбер','оцен','помоги','сформулир','перепиш','объясни','создай','распиш','придума','предлож']},
+  {name:'Контекст', words:['потому','клиент','коллег','руковод','команд','отдел','подрядчик','для ','наш','встреч','вебинар','модул','новичк','срок','дедлайн','бюджет','ситуац','второй раз','отказ','созвон','заметк','онбординг','обратн']},
+  {name:'Правила', words:['тон','коротк','без ','не ','избег','формальн','дружелюб','профессион','разговорн','канцеляр','стиль','мягк','вежлив','строг','просто','живо','чтобы не','не дави','деликат','уважен']},
+  {name:'Результат', words:['знак','символ','слов','пункт','список','письмо','пост','повестк','тест','вопрос','структур','модул','абзац','готов','на выходе','в формате','таблиц','с примерами','шаг','5 ','план','черновик']}
+];
+function countHits(t,arr){return arr.filter(w=>t.includes(w)).length;}
+
+function analyze(prompt){
+  const t=prompt.toLowerCase();
+  const words=prompt.trim().split(/\s+/).length;
+  const res=[];
+
+  const task=countHits(t,CRIT[0].verbs)>0;
+  res.push({name:'Задача',ok:task,
+    yes:'Понятно, какое действие нужно от модели.',
+    no:'Нет глагола действия — начни с «напиши», «собери», «преврати».'});
+
+  const cx=countHits(t,CRIT[1].words);
+  res.push({name:'Контекст',ok:cx>=2,half:cx===1,
+    yes:'Есть детали ситуации — угадывать не придётся.',
+    half:'Контекст едва намечен. Добавь, кто адресат и что произошло.',
+    no:'Нет контекста: кто адресат, что за ситуация, что важно знать?'});
+
+  const rl=countHits(t,CRIT[2].words);
+  res.push({name:'Правила и ограничения',ok:rl>=2,half:rl===1,
+    yes:'Заданы тон и рамки — ответ не уедет в сторону.',
+    half:'Тон намечен, но рамок мало. Что должно быть, чего избегать?',
+    no:'Нет тона и ограничений. Какой стиль? Что нельзя?'});
+
+  const rs=countHits(t,CRIT[3].words);
+  res.push({name:'Результат',ok:rs>=1&&words>=18,half:rs>=1,
+    yes:'Понятно, что получится на выходе.',
+    half:'Формат намечен, но скупо. Уточни объём или структуру.',
+    no:'Не сказано, что на выходе — письмо? пост? список? объём?'});
+
+  let score=res.reduce((s,c)=>s+(c.ok?25:c.half?12:0),0);
+  if(words<8)score=Math.min(score,30);
+  const okN=res.filter(c=>c.ok).length;
+  let verdict;
+  if(score>=85)verdict='Крепкий промт — отправляй.';
+  else if(score>=55)verdict='Рабочий, но есть что подтянуть.';
+  else if(score>=30)verdict='Половина на месте, половины не хватает.';
+  else verdict='Так модели придётся угадывать.';
+  return {res,score,verdict,okN};
+}
+
+const caseMount=document.getElementById('caseMount');
+practiceScenarios.forEach((scen,i)=>{
+  const isLast=i===practiceScenarios.length-1;
+  // input slide
+  const inSlide=document.createElement('div');
+  inSlide.className='slide';inSlide.dataset.slide='case'+i;
+  inSlide.innerHTML=`
+    <div class="kicker">Кейс ${i+1} из ${practiceScenarios.length}</div>
+    <h2>Напиши промт</h2>
+    <div class="scenario-tag"><div class="lbl">Ситуация</div><p>${scen}</p></div>
+    <textarea class="big-ta" id="ta${i}" placeholder="Пиши промт здесь…"></textarea>
+    <div class="err" id="err${i}"></div>
+    <div class="nav">
+      <button class="btn btn-ghost" data-go="prev">← Назад</button>
+      <button class="btn btn-primary" data-check="${i}">Проверить промт</button>
+    </div>`;
+  caseMount.appendChild(inSlide);
+  // feedback slide
+  const fbSlide=document.createElement('div');
+  fbSlide.className='slide';fbSlide.dataset.slide='fb'+i;
+  fbSlide.innerHTML=`
+    <div class="kicker">Кейс ${i+1} · разбор</div>
+    <div class="eval show" id="fbbox${i}"></div>
+    <div class="nav">
+      <button class="btn btn-ghost" data-go="prev">← Переписать</button>
+      <button class="btn btn-primary" data-go="next">${isLast?'Завершить →':'Следующий кейс →'}</button>
+    </div>`;
+  caseMount.appendChild(fbSlide);
+});
+
+/* check button → analyze → render feedback → advance */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-check]');
+  if(!b)return;
+  const i=+b.dataset.check;
+  const ta=document.getElementById('ta'+i), err=document.getElementById('err'+i);
+  const prompt=ta.value.trim();
+  err.style.display='none';
+  if(prompt.length<10){err.textContent='Напиши хотя бы пару фраз — иначе нечего проверять.';err.style.display='block';return;}
+  renderFeedback(i,prompt,analyze(prompt));
+  go(activeSlide+1);
+});
+
+function renderFeedback(i,prompt,a){
+  const box=document.getElementById('fbbox'+i);
+  const circ=2*Math.PI*30, off=circ*(1-a.score/100);
+  const color=a.score>=75?'var(--green)':a.score>=45?'var(--orange)':'var(--red)';
+  box.innerHTML=`
+    <div class="myprompt"><div class="lbl">Твой промт</div><p>${prompt.replace(/</g,'&lt;')}</p></div>
+    <div class="score-row">
+      <div class="score-ring">
+        <svg width="68" height="68"><circle cx="34" cy="34" r="30" fill="none" stroke="var(--panel-2)" stroke-width="6"/>
+        <circle cx="34" cy="34" r="30" fill="none" stroke="${color}" stroke-width="6" stroke-dasharray="${circ}" stroke-dashoffset="${circ}" stroke-linecap="round" id="ring${i}"/></svg>
+        <div class="num">${a.score}</div>
+      </div>
+      <div class="score-verdict">${a.verdict}<small>${a.okN} из 4 критериев закрыто</small></div>
+    </div>
+    <div class="crit">${a.res.map(c=>{
+      const st=c.ok?'yes':c.half?'mid':'no', mk=c.ok?'✓':c.half?'~':'✕';
+      const note=c.ok?c.yes:c.half?c.half:c.no;
+      return `<div class="crit-item"><span class="crit-mark ${st}">${mk}</span>
+        <div class="crit-body"><strong>${c.name}</strong><span>${note}</span></div></div>`;
+    }).join('')}</div>`;
+  setTimeout(()=>{const r=document.getElementById('ring'+i);if(r){r.style.transition='stroke-dashoffset .9s ease';r.style.strokeDashoffset=off;}},80);
+}
+
+/* ---------- NAV / RAIL ---------- */
+const slides=[...document.querySelectorAll('.slide')];
+const TOTAL=slides.length;
+let activeSlide=0;
+const rail=document.getElementById('rail');
+for(let i=0;i<TOTAL;i++){const p=document.createElement('div');p.className='pip';p.innerHTML='<span></span>';rail.appendChild(p);}
+const railNum=document.createElement('span');railNum.className='rail-num';rail.appendChild(railNum);
+
+function go(n){
+  if(n<0||n>=TOTAL)return;
+  slides.forEach(s=>s.classList.remove('active'));
+  slides[n].classList.add('active');activeSlide=n;
+  const deck=document.querySelector('.deck');if(deck)deck.scrollTo({top:0,behavior:'smooth'});
+  updateRail();
+}
+function updateRail(){
+  [...rail.querySelectorAll('.pip')].forEach((p,i)=>{
+    p.classList.remove('done','active');
+    if(i<activeSlide)p.classList.add('done');else if(i===activeSlide)p.classList.add('active');
+  });
+  railNum.textContent=(activeSlide+1)+' / '+TOTAL;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-go]');if(!b)return;
+  if(b.dataset.go==='next')go(activeSlide+1);
+  else if(b.dataset.go==='prev')go(activeSlide-1);
+  else if(b.dataset.go==='restart'){
+    document.querySelectorAll('.big-ta').forEach(t=>t.value='');
+    go(0);
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='TEXTAREA')return;
+  if(e.key==='ArrowRight')go(activeSlide+1);if(e.key==='ArrowLeft')go(activeSlide-1);
+});
+updateRail();
+</script>
+</body>
+</html>
